@@ -1,0 +1,3 @@
+[submodule "nexusui"]
+	path = nexusui
+	url = git@github.com:nexus-js/ui.git
