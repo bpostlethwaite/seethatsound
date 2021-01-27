@@ -1,0 +1,47 @@
+{
+  "name": "seethatsound",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "node server.js",
+    "watchcss": "postcss --use autoprefixer --use tailwindcss -o app/main.css app/tailwind.css --watch",
+    "css": "postcss --use autoprefixer --use tailwindcss -o app/main.css app/tailwind.css "
+  },
+  "author": "",
+  "license": "",
+  "dependencies": {
+    "express": "^4.17.1",
+    "mustache": "^4.1.0"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.2.1",
+    "eslint": "^7.17.0",
+    "postcss": "^8.2.4",
+    "postcss-cli": "^8.3.1",
+    "prettier": "^2.2.1",
+    "tailwindcss": "^2.0.2"
+  },
+  "eslintConfig": {
+    "env": {
+      "browser": true
+    },
+    "parserOptions": {
+      "ecmaVersion": 2021,
+      "sourceType": "module"
+    },
+    "globals": {
+      "Worker": "readonly",
+      "html": "readonly"
+    },
+    "rules": {
+      "no-console": "off",
+      "a11y-missing-attribute": "off"
+    }
+  },
+  "prettier": {
+    "bracketSpacing": false,
+    "trailingCommoa": "es5",
+    "tabWidth": 2
+  }
+}

@@ -1,0 +1,16 @@
+<template id="app-header">
+    <header class="py-5 bg-gray-700 text-white text-center">
+        {{ title }}
+    </header>
+</template>
+
+<script type="module">
+ import synergy from "./modules/synergy/index.js";
+ synergy.define(
+     'app-header',
+     ({
+         title = "See That Sound",
+     }) => ({title}),
+     document.getElementById("app-header")
+ );
+</script>

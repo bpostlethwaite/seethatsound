@@ -1,0 +1,21 @@
+<my-paragraph>
+  <span slot="my-text">Let's have some different text!</span>
+</my-paragraph>
+
+<script type="module">
+ const mp = document.querySelector("my-paragraph");
+
+ const titles = ['Rock', 'Paper', 'Scissor'];
+ const subtitles = ['SubRock', 'SubPaper', 'SubScissor'];
+ const pages = ["one", "two", "three"]
+ const cons = {dump: "robo"}
+ setTimeout(() => {
+
+   var title = titles[Math.floor(Math.random()*titles.length)];
+   var subtitle = subtitles[Math.floor(Math.random()*subtitles.length)];
+
+   mp.data = {title, subtitle, pages, cons};
+ }, 1000);
+
+
+</script>

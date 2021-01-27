@@ -1,0 +1,112 @@
+<template id="my-paragraph">
+  <div>Mo {{title}} tho {{subtitle}} har {{cons.dump}}</div>
+  <p><slot name="my-text">My default text</slot></p>
+  <template each="page in pages">
+    <a href="/{{page}}" class="hover:bg-gray-400 px-12 py-2 rounded">
+      <i class="fa fa-dashboard"></i>
+      <span class="">{{ page }}</span>
+    </a>
+  </template>
+</template>
+
+
+<script type="module">
+
+ import mergeSlots from "./modules/synergy/mergeSlots.js";
+ import {walk, hasMustache, getParts} from "./modules/synergy/helpers.js"
+
+
+ function parseTextNode(value, node) {
+   if (!hasMustache(value)) return;
+
+   const parts = getParts(value, []);
+
+   return function(comp) {
+     const newValue = parts.map(part => {
+       if (part.type === "key") {
+         // Support {{book.title}} references
+         const paths = part.value.split(".");
+         return paths.reduce((acc, curr) => acc[curr], comp)
+       } else {
+         return part.value;
+       }
+     });
+     node.nodeValue = newValue.join("");
+   }
+ }
+
+ function bind(templateFragment) {
+   const bindings = [];
+   function dispatch(node) {
+     switch (node.nodeType) {
+       case node.TEXT_NODE: {
+         const binding = parseTextNode(node.nodeValue, node);
+         if (binding) bindings.push(binding);
+         break;
+       }
+     }
+   }
+
+   walk(templateFragment, dispatch);
+
+   return bindings;
+ }
+
+
+ function all(funcs, arg) {
+   funcs.forEach(func => func(arg));
+ }
+
+
+ customElements.define(
+   'my-paragraph',
+   class extends HTMLElement {
+     constructor() {
+       super();
+
+       const template = document.getElementById('my-paragraph');
+       this.templateContent = template.content;
+
+       this._data = {
+         title: "thor",
+         subtitle: "subthor",
+         cons: {dump: "trust"},
+         pages: ["one", "two", "three"]
+       }
+
+       this.bindings = [];
+     }
+
+     connectedCallback() {
+       const frag = this.templateContent.cloneNode(true);
+       mergeSlots(this, frag);
+       this.bindings = bind(frag);
+
+       all(this.bindings, this);
+       this.appendChild(frag);
+     }
+
+     set data(v) {
+       this._data = v;
+
+       all(this.bindings, this);
+     }
+
+     get title() {
+       return this._data.title;
+     }
+
+     get subtitle() {
+       return this._data.subtitle;
+     }
+
+     get pages() {
+       return this._data.pages;
+     }
+
+     get cons() {
+       return this._data.cons;
+     }
+   }
+ );
+</script>

@@ -1,0 +1,26 @@
+<template id="app-sidebar">
+    <aside class="bg-white h-screen py-5 shadow">
+        <div class="flex flex-col text-left">
+            <template each="page in pages">
+                <a href="/{{page}}" class="hover:bg-gray-400 px-12 py-2 rounded">
+                    <i class="fa fa-dashboard"></i>
+                    <span class="">{{ page }}</span>
+                </a>
+            </template>
+        </div>
+    </aside>
+</template>
+
+<script type="module">
+ import synergy from "./modules/synergy/index.js";
+
+ const pages = window.globals.pages;
+ const title = "See That Sound";
+ const factory = () => ({title, pages});
+
+ synergy.define(
+     'app-sidebar',
+     factory,
+     document.getElementById("app-sidebar")
+ );
+</script>

@@ -1,0 +1,177 @@
+<template id="app-page">
+  <div id="console">...loading...</div>
+
+  <canvas
+    id="scope"
+    width="400"
+    height="200"
+    style="border:1px solid#000000;"
+  ></canvas>
+  <canvas
+    id="mags"
+    width="400"
+    height="200"
+    style="border:1px solid#000000;"
+   ></canvas>
+  <p>
+    <button id="playButton" disabled>play</button>
+  </p>
+
+  <div id="editor"></div>
+  <textarea class="code" id="instruments" hidden>
+    /* this is the synthesis code for this example */
+    nchnls=2
+    0dbfs=1
+    instr 1
+    k1 expon p4,p3,p4*0.001
+    a1 oscili k1,p5
+    chnset p5, "freq"
+    outs a1,a1
+    schedule 1,0.25,0.5,0.3+rnd(0.2),1000+birnd(500)
+    endin
+    schedule 1,0,0.5,0.1,500
+  </textarea>
+</template>
+
+<script type="module">
+  import Editor from "./modules/editor/Editor.js";
+  import synergy from "./modules/synergy/index.js";
+
+  function getRandomColor() {
+    const letters = "0123456789ABCDEF".split("");
+    let color = "#";
+    for (var i = 0; i < 6; i++) {
+      color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+  }
+
+  let playing = false;
+  function click_this() {
+    if (playing == false) {
+      CSOUND_AUDIO_CONTEXT.resume();
+      document.getElementById("playButton").innerText = "pause";
+      playing = true;
+    } else {
+      CSOUND_AUDIO_CONTEXT.suspend();
+      document.getElementById("playButton").innerText = "play";
+      playing = false;
+    }
+  }
+
+  synergy.define(
+    'app-page',
+    () => ({
+      connectedCallback() {
+        document
+          .getElementById("playButton")
+          .addEventListener("click", click_this);
+
+        runExample();
+      }
+    }),
+    document.getElementById("app-page")
+  );
+
+
+  function runExample() {
+    let docdata = {
+      uid: "123",
+      filename: "example.orc",
+      currentValue: document.getElementById("instruments").value,
+    };
+    let editor = new Editor({docdata});
+    editor.onMount(document.getElementById("editor"));
+
+    CsoundObj.importScripts("./js/").then(() => {
+      let random_colour;
+      document.getElementById("playButton").disabled = false;
+      CSOUND_AUDIO_CONTEXT.suspend();
+      const csound = new CsoundObj();
+
+      const messField = document.getElementById("console");
+      csound.setMessageCallback((msg) => {
+        csound.requestControlChannel("freq", function () {
+          const freq = Math.round(csound.getControlChannel("freq"));
+          messField.innerText = msg + " :: " + freq + " Hz";
+          random_colour = messField.style.color = getRandomColor();
+        });
+      });
+
+      csound.compileOrc(document.getElementById("instruments").value);
+      csound.start();
+      window.addEventListener(
+        "unload",
+        function (e) {
+          if (csound != null) csound.destroy();
+        },
+        false
+      );
+
+      const scopeNode = CSOUND_AUDIO_CONTEXT.createAnalyser();
+      csound.getNode().connect(scopeNode);
+
+      const scope = function () {
+        let ctx = document.getElementById("scope").getContext("2d");
+        let width = ctx.canvas.width;
+        let height = ctx.canvas.height;
+        let timeData = new Uint8Array(scopeNode.frequencyBinCount);
+        let scaling = height / 256;
+        let risingEdge = 0;
+        let edgeThreshold = 5;
+        scopeNode.getByteTimeDomainData(timeData);
+
+        ctx.fillStyle = "rgba(0, 20, 0, 0.1)";
+        ctx.fillRect(0, 0, width, height);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = random_colour;
+        ctx.beginPath();
+
+        while (timeData[risingEdge++] - 128 > 0 && risingEdge <= width);
+        if (risingEdge >= width) risingEdge = 0;
+        while (
+          timeData[risingEdge++] - 128 < edgeThreshold &&
+            risingEdge <= width
+        );
+        if (risingEdge >= width) risingEdge = 0;
+        for (
+          let x = risingEdge;
+          x < timeData.length && x - risingEdge < width;
+          x++
+        )
+          ctx.lineTo(x - risingEdge, height - timeData[x] * scaling);
+        ctx.stroke();
+
+        requestAnimationFrame(scope);
+      };
+
+      scope();
+
+      const mags = function () {
+        let ctx = document.getElementById("mags").getContext("2d");
+        let width = ctx.canvas.width;
+        let height = ctx.canvas.height;
+        let freqData = new Uint8Array(scopeNode.frequencyBinCount);
+        let scaling = height / 256;
+
+        scopeNode.getByteFrequencyData(freqData);
+
+        ctx.fillStyle = "rgba(0, 20, 0, 0.1)";
+        ctx.fillRect(0, 0, width, height);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = random_colour;
+        ctx.beginPath();
+
+        for (let x = 0; x < width; x++)
+          ctx.lineTo(x, height - freqData[x] * scaling);
+
+        ctx.stroke();
+        requestAnimationFrame(mags);
+      };
+      mags();
+    });
+  }
+
+
+
+</script>

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en" class="text-gray-900 leading-tight h-full w-full">
+  <head>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>SEE THAT SOUND</title>
+    <meta name="author" content="Ben Postlethwaite">
+    <meta name="description" content="description here">
+    <meta name="keywords" content="keywords,here">
+
+    <link async rel="stylesheet" href="main.css" />
+
+    {{{codemirrorHtml}}}
+
+    <script async src="js/CsoundObj.js"></script>
+    <script type="module" src="modules/globals.js"></script>
+    <script>
+      {{{globals}}}
+    </script>
+  </head>
+
+  <body class="h-full w-full">
+
+    {{{componentHtml}}}
+
+    {{{pageHtml}}}
+    <div class="flex flex-col h-screen">
+      <app-header></app-header>
+      <div class="flex">
+        <app-sidebar></app-sidebar>
+        <!-- Main Page -->
+        <main class="bg-gray-200 flex-1">
+          <div id="page">
+            <app-page></app-page>
+          </div>
+        </main>
+      </div>
+  </body>
+</html>
