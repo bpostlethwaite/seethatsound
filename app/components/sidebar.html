@@ -12,15 +12,9 @@
 </template>
 
 <script type="module">
- import synergy from "./modules/synergy/index.js";
+ import Syn from "./modules/syn/index.js";
 
  const pages = window.globals.pages;
  const title = "See That Sound";
- const factory = () => ({title, pages});
-
- synergy.define(
-     'app-sidebar',
-     factory,
-     document.getElementById("app-sidebar")
- );
+ Syn("app-sidebar").state({title, pages}).define();
 </script>

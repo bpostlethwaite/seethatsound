@@ -17,23 +17,117 @@
 
 
 <script type="module">
- import synergy from "./modules/synergy/index.js";
+ import Syn from "./modules/syn/index.js";
+
+ /* const AnalysisView = () => {
+  *   let scopeId;
+  *   let magsId;
+  *   let analysisNode;
+
+  *   return {
+  *     scope() {
+  *       let ctx = document.getElementById("scope").getContext("2d");
+  *       let width = ctx.canvas.width;
+  *       let height = ctx.canvas.height;
+  *       let timeData = new Uint8Array(analysisNode.frequencyBinCount);
+  *       let scaling = height / 256;
+  *       let risingEdge = 0;
+  *       let edgeThreshold = 5;
+  *       analysisNode.getByteTimeDomainData(timeData);
+
+  *       ctx.fillStyle = "rgba(0, 20, 0, 0.1)";
+  *       ctx.fillRect(0, 0, width, height);
+  *       ctx.lineWidth = 2;
+  *       ctx.strokeStyle = "green";
+  *       ctx.beginPath();
+
+  *       while (timeData[risingEdge++] - 128 > 0 && risingEdge <= width);
+  *       if (risingEdge >= width) risingEdge = 0;
+  *       while (
+  *         timeData[risingEdge++] - 128 < edgeThreshold &&
+  *         risingEdge <= width
+  *       );
+  *       if (risingEdge >= width) risingEdge = 0;
+  *       for (
+  *         let x = risingEdge;
+  *         x < timeData.length && x - risingEdge < width;
+  *         x++
+  *       )
+  *         ctx.lineTo(x - risingEdge, height - timeData[x] * scaling);
+  *       ctx.stroke();
+  *       scopeId = requestAnimationFrame(this.scope);
+  *     },
+
+  *     mags() {
+  *       let ctx = document.getElementById("mags").getContext("2d");
+  *       let width = ctx.canvas.width;
+  *       let height = ctx.canvas.height;
+  *       let freqData = new Uint8Array(analysisNode.frequencyBinCount);
+  *       let scaling = height / 256;
+
+  *       analysisNode.getByteFrequencyData(freqData);
+
+  *       ctx.fillStyle = "rgba(0, 20, 0, 0.1)";
+  *       ctx.fillRect(0, 0, width, height);
+  *       ctx.lineWidth = 2;
+  *       ctx.strokeStyle = "green";
+  *       ctx.beginPath();
+
+  *       for (let x = 0; x < width; x++)
+  *         ctx.lineTo(x, height - freqData[x] * scaling);
+
+  *       ctx.stroke();
+  *       magsId = requestAnimationFrame(this.mags);
+  *     },
+
+  *     connectedCallback() {
+  *       this.scope = this.scope.bind(this);
+  *       this.mags = this.mags.bind(this);
+  *     },
+
+  *     disconnectedCallback() {
+  *       cancelAnimationFrame(scopeId);
+  *       cancelAnimationFrame(magsId);
+
+  *       if (analysisNode) {
+  *         this.props.csound.getNode().disconnect(analysisNode);
+  *         analysisNode = null;
+  *       }
+  *     },
+
+  *     updatedCallback(prevProps) {
+  *       if (prevProps.disabled && !this.props.disabled) {
+  *         analysisNode = CSOUND_AUDIO_CONTEXT.createAnalyser();
+  *         this.props.csound.getNode().connect(analysisNode);
+  *         scopeId = requestAnimationFrame(this.scope);
+  *         magsId = requestAnimationFrame(this.mags);
+  *       }
+
+  *       if (!prevProps.disabled && this.props.disabled) {
+  *         this.props.csound.getNode().disconnect(analysisNode);
+  *         analysisNode = null;
+  *         cancelAnimationFrame(scopeId);
+  *         cancelAnimationFrame(magsId);
+  *       }
+  *     }
+  *   }
+  * } */
+
  const AnalysisView = () => {
    let scopeId;
    let magsId;
-   return {
+   let analysisNode;
 
-     csound: null,
-     
+   return {
      scope() {
        let ctx = document.getElementById("scope").getContext("2d");
        let width = ctx.canvas.width;
        let height = ctx.canvas.height;
-       let timeData = new Uint8Array(this.analysisNode.frequencyBinCount);
+       let timeData = new Uint8Array(analysisNode.frequencyBinCount);
        let scaling = height / 256;
        let risingEdge = 0;
        let edgeThreshold = 5;
-       this.analysisNode.getByteTimeDomainData(timeData);
+       analysisNode.getByteTimeDomainData(timeData);
 
        ctx.fillStyle = "rgba(0, 20, 0, 0.1)";
        ctx.fillRect(0, 0, width, height);
@@ -48,7 +142,7 @@
          risingEdge <= width
        );
        if (risingEdge >= width) risingEdge = 0;
-       for (         
+       for (
          let x = risingEdge;
          x < timeData.length && x - risingEdge < width;
          x++
@@ -62,10 +156,10 @@
        let ctx = document.getElementById("mags").getContext("2d");
        let width = ctx.canvas.width;
        let height = ctx.canvas.height;
-       let freqData = new Uint8Array(this.analysisNode.frequencyBinCount);
+       let freqData = new Uint8Array(analysisNode.frequencyBinCount);
        let scaling = height / 256;
 
-       this.analysisNode.getByteFrequencyData(freqData);
+       analysisNode.getByteFrequencyData(freqData);
 
        ctx.fillStyle = "rgba(0, 20, 0, 0.1)";
        ctx.fillRect(0, 0, width, height);
@@ -77,45 +171,47 @@
          ctx.lineTo(x, height - freqData[x] * scaling);
 
        ctx.stroke();
-       magsId = requestAnimationFrame(mags);
+       magsId = requestAnimationFrame(this.mags);
      },
 
      connectedCallback() {
+       this.scope = this.scope.bind(this);
+       this.mags = this.mags.bind(this);
      },
 
      disconnectedCallback() {
        cancelAnimationFrame(scopeId);
        cancelAnimationFrame(magsId);
 
-       if (this.analysisNode) {
-         this.csound.getNode().disconnect(this.analysisNode);         
+       if (analysisNode) {
+         this.props.csound.getNode().disconnect(analysisNode);
+         analysisNode = null;
        }
      },
 
-     updatedCallback(prevState) {
-       if (this.csound && !this.analysisNode && this.disabled) {
-         this.analysisNode = CSOUND_AUDIO_CONTEXT.createAnalyser();
-         this.csound.getNode().connect(this.analysisNode);   
+     updatedCallback(prevProps) {
+       if (prevProps.disabled && !this.props.disabled) {
+         analysisNode = CSOUND_AUDIO_CONTEXT.createAnalyser();
+         this.props.csound.getNode().connect(analysisNode);
          scopeId = requestAnimationFrame(this.scope);
-         magsId = requestAnimationFrame(this.mags);         
+         magsId = requestAnimationFrame(this.mags);
        }
 
-       if (this.analysisNode && this.disabled === true) {
-         this.csound.getNode().disconnect(this.analysisNode);
-         this.analysisNode = null;
+       if (!prevProps.disabled && this.props.disabled) {
+         this.props.csound.getNode().disconnect(analysisNode);
+         analysisNode = null;
          cancelAnimationFrame(scopeId);
-         cancelAnimationFrame(magsId);         
-       }       
+         cancelAnimationFrame(magsId);
+       }
      }
    }
  }
 
 
- synergy.define(
-   "analysis-view",
-   AnalysisView,
-   document.getElementById("analysis-view"),
-   {observedAttributes: ["disabled", "csound"]}     
- );
+
+ Syn("analysis-view")
+   .state({csound: null, disabled: true})
+   .view(AnalysisView())
+   .define();
 
 </script>

@@ -7,7 +7,7 @@ const app = express();
 
 app.use(express.static("public"));
 
-const pages = ["", "main", "basic", "noodle"];
+const pages = ["", "main", "basic", "test"];
 const encoding = "utf8";
 
 async function getComponentHtml() {

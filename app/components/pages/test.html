@@ -1,0 +1,23 @@
+<link rel="shortcut icon" type="image/png" href="lib/jasmine-3.6.0/jasmine_favicon.png">
+<link rel="stylesheet" type="text/css" href="lib/jasmine-3.6.0/jasmine.css">
+
+<script type="text/javascript" src="lib/jasmine-3.6.0/jasmine.js"></script>
+<script type="text/javascript" src="lib/jasmine-3.6.0/jasmine-html.js"></script>
+<script type="text/javascript" src="lib/jasmine-3.6.0/boot.js"></script>
+
+
+<template id="test-1">
+  <button disabled="{{}}"></button>
+</template>
+
+<script type="module">
+ import Syn from "./modules/syn/index.js";
+
+ const view = {
+   connectedCallback() {
+     this.setState({disabled: false});
+   }
+ }
+ Syn("test-1").view(view).state({disabled: true}).define();
+
+</script>

@@ -1,9 +1,12 @@
 <template id="app-page">
   <div id="console">...loading...</div>
 
-  <analysis-view disabled></analysis-view>
+  <analysis-view
+    disabled="{{disabled}}"
+    csound="{{csound}}"
+  ></analysis-view>
   <p>
-    <button id="playButton" disabled>play</button>
+    <button id="playButton" disabled="{{disabled}}">play</button>
   </p>
 
   <div id="editor"></div>
@@ -24,10 +27,61 @@
 
 <script type="module">
   import Editor from "./modules/editor/Editor.js";
-  import synergy from "./modules/synergy/index.js";
+  import Syn from "./modules/syn/index.js";
 
-  let playing = false;
-  function click_this() {
+
+ function Page() {
+   return {
+     runExample() {
+       let docdata = {
+         uid: "123",
+         filename: "example.orc",
+         currentValue: document.getElementById("instruments").value,
+       };
+       let editor = new Editor({docdata});
+       editor.onMount(document.getElementById("editor"));
+
+       CsoundObj.importScripts("./js/").then(() => {
+         let random_colour;
+         CSOUND_AUDIO_CONTEXT.suspend();
+         const csound = new CsoundObj();
+
+         this.setState(() => ({csound, disabled: false}));
+
+         const messField = document.getElementById("console");
+         csound.setMessageCallback((msg) => {
+           csound.requestControlChannel("freq", function () {
+             const freq = Math.round(csound.getControlChannel("freq"));
+             messField.innerText = msg + " :: " + freq + " Hz";
+           });
+         });
+
+         csound.compileOrc(document.getElementById("instruments").value);
+         csound.start();
+         window.addEventListener(
+           "unload",
+           function (e) {
+             if (csound != null) csound.destroy();
+           },
+           false
+         );
+       });
+     },
+
+     connectedCallback() {
+       document
+         .getElementById("playButton")
+         .addEventListener("click", click_this);
+       setTimeout(() => {
+         this.runExample();
+       }, 500);
+     },
+   };
+ }
+
+
+ let playing = false;
+ function click_this() {
     if (playing == false) {
       CSOUND_AUDIO_CONTEXT.resume();
       document.getElementById("playButton").innerText = "pause";
@@ -39,59 +93,7 @@
     }
   }
 
-  synergy.define(
-    'app-page',
-    () => ({
-      connectedCallback() {
-        document
-          .getElementById("playButton")
-          .addEventListener("click", click_this);
-        setTimeout(() => {
-          runExample();
-        }, 500);
-      }
-    }),
-    document.getElementById("app-page")
-  );
-
-
-  function runExample() {
-    let docdata = {
-      uid: "123",
-      filename: "example.orc",
-      currentValue: document.getElementById("instruments").value,
-    };
-    let editor = new Editor({docdata});
-    editor.onMount(document.getElementById("editor"));
-
-    CsoundObj.importScripts("./js/").then(() => {
-      let random_colour;
-      document.getElementById("playButton").disabled = false;
-      CSOUND_AUDIO_CONTEXT.suspend();
-      const csound = new CsoundObj();
-
-      document.getElementById("analysis-view").csound = csound;
-      document.getElementById("analysis-view").disabled = false;
-
-      const messField = document.getElementById("console");
-      csound.setMessageCallback((msg) => {
-        csound.requestControlChannel("freq", function () {
-          const freq = Math.round(csound.getControlChannel("freq"));
-          messField.innerText = msg + " :: " + freq + " Hz";
-        });
-      });
-
-      csound.compileOrc(document.getElementById("instruments").value);
-      csound.start();
-      window.addEventListener(
-        "unload",
-        function (e) {
-          if (csound != null) csound.destroy();
-        },
-        false
-      );
-    });
-  }
+ Syn("app-page").state({disabled: true, csound: null}).view(Page()).define();
 
 
 

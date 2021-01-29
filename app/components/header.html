@@ -5,12 +5,6 @@
 </template>
 
 <script type="module">
- import synergy from "./modules/synergy/index.js";
- synergy.define(
-     'app-header',
-     ({
-         title = "See That Sound",
-     }) => ({title}),
-     document.getElementById("app-header")
- );
+ import Syn from "./modules/syn/index.js";
+ Syn("app-header").state({title:"See That Sound"}).define();
 </script>
