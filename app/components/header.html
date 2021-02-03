@@ -6,5 +6,10 @@
 
 <script type="module">
  import Syn from "./modules/syn/index.js";
- Syn("app-header").state({title:"See That Sound"}).define();
+
+ function appHeader() {
+   return {title: "See That Sound"};
+ }
+
+ Syn("app-header").render(appHeader).define();
 </script>

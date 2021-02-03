@@ -1,82 +1,87 @@
 var buckets = new WeakMap();
-var tngStack = [];
+var synStack = [];
 
 // ******************
 
-export function TNG(...fns) {
-  fns = fns.map(function mapper(fn) {
-    tngf.reset = reset;
-    return tngf;
+export function SynHook(fn, opts = {}) {
+  synf.reset = reset;
 
-    // ******************
+  const {delayEffectStack = false} = opts;
 
-    function tngf(...args) {
-      tngStack.push(tngf);
-      var bucket = getCurrentBucket();
+  // ******************
+  function synf(...args) {
+    synStack.push(synf);
+    var bucket = getCurrentBucket();
+
+    bucket.nextStateSlotIdx = 0;
+    bucket.nextEffectIdx = 0;
+    bucket.nextMemoizationIdx = 0;
+    bucket.currentNode = null;
+
+    try {
+      return fn.apply(this, args);
+    } finally {
+      // run (cleanups and) effects, if any
+      try {
+        if (delayEffectStack && synStack.length > 0) {
+          transferEffects(bucket, getRootBucket());
+        } else {
+          runEffects(bucket);
+        }
+      } finally {
+        synStack.pop();
+      }
+    }
+  }
+
+  function transferEffects(fromBucket, toBucket) {
+    toBucket.effects = fromBucket.effects.concat(toBucket.effects);
+  }
+
+  function runEffects(bucket) {
+    for (let [idx, [effect, guards]] of bucket.effects.entries()) {
+      try {
+        if (typeof effect == "function") {
+          effect();
+        }
+      } finally {
+        bucket.effects[idx][0] = undefined;
+      }
+    }
+  }
+
+  function reset() {
+    synStack.push(synf);
+    var bucket = getCurrentBucket();
+    try {
+      // run all pending cleanups
+      for (let cleanup of bucket.cleanups) {
+        if (typeof cleanup == "function") {
+          cleanup();
+        }
+      }
+    } finally {
+      synStack.pop();
+      bucket.stateSlots.length = 0;
+      bucket.effects.length = 0;
+      bucket.cleanups.length = 0;
+      bucket.memoizations.length = 0;
+      bucket.events.length = 0;
       bucket.nextStateSlotIdx = 0;
       bucket.nextEffectIdx = 0;
       bucket.nextMemoizationIdx = 0;
-
-      // HACK
-      if (fn.scheduleRender) {
-        bucket.scheduleRender = fn.scheduleRender;
-      }
-
-      try {
-        return fn.apply(this, args);
-      } finally {
-        // run (cleanups and) effects, if any
-        try {
-          runEffects(bucket);
-        } finally {
-          tngStack.pop();
-        }
-      }
+      bucket.currentNode = null;
     }
+  }
 
-    function runEffects(bucket) {
-      for (let [idx, [effect, guards]] of bucket.effects.entries()) {
-        try {
-          if (typeof effect == "function") {
-            effect();
-          }
-        } finally {
-          bucket.effects[idx][0] = undefined;
-        }
-      }
-    }
-
-    function reset() {
-      tngStack.push(tngf);
-      var bucket = getCurrentBucket();
-      try {
-        // run all pending cleanups
-        for (let cleanup of bucket.cleanups) {
-          if (typeof cleanup == "function") {
-            cleanup();
-          }
-        }
-      } finally {
-        tngStack.pop();
-        bucket.stateSlots.length = 0;
-        bucket.effects.length = 0;
-        bucket.cleanups.length = 0;
-        bucket.memoizations.length = 0;
-        bucket.nextStateSlotIdx = 0;
-        bucket.nextEffectIdx = 0;
-        bucket.nextMemoizationIdx = 0;
-      }
-    }
-  });
-
-  return fns.length < 2 ? fns[0] : fns;
+  return synf;
 }
 
 function getCurrentBucket() {
-  if (tngStack.length > 0) {
-    let tngf = tngStack[tngStack.length - 1];
+  if (synStack.length > 0) {
+    let synf = synStack[synStack.length - 1];
     let bucket;
-    if (!buckets.has(tngf)) {
+    if (!buckets.has(synf)) {
       bucket = {
         nextStateSlotIdx: 0,
         nextEffectIdx: 0,
@@ -85,11 +90,126 @@ function getCurrentBucket() {
         effects: [],
         cleanups: [],
         memoizations: [],
+        events: [],
+        currentNode: null,
       };
-      buckets.set(tngf, bucket);
+      buckets.set(synf, bucket);
     }
 
-    return buckets.get(tngf);
+    return buckets.get(synf);
+  }
+}
+
+function getRootBucket() {
+  let synf = synStack[0];
+  if (!buckets.has(synf)) {
+    throw new Error(
+      "SynHook Invariant Error - Expected root synf bucket to exist"
+    );
+  }
+  return buckets.get(synf);
+}
+
+export function useNode() {
+  var bucket = getCurrentBucket();
+  if (bucket) {
+    return [
+      bucket.currentNode,
+      function setNode(node) {
+        if (typeof node === "function") {
+          bucket.currentNode = node(bucket.currentNode);
+        } else {
+          bucket.currentNode = node;
+        }
+      },
+    ];
+  } else {
+    throw new Error(
+      "usenode() only valid inside an Articulated Function or a Custom Hook."
+    );
+  }
+}
+
+/*
+ * TODO get rid of currentNode.ref.event logic
+ * That should be handled by Weact not the hook machinery
+ */
+export function useEvent(name, fn, ...guards) {
+  //const guards = [name, fn];
+  // passed in any guards?
+  if (guards.length > 0) {
+    // only passed a single guards list?
+    if (guards.length == 1 && Array.isArray(guards[0])) {
+      guards = guards[0];
+    }
+  }
+  // no guards passed
+  // NOTE: different handling than an empty guards list like []
+  else {
+    guards = undefined;
+  }
+
+  var bucket = getCurrentBucket();
+  if (bucket && bucket.currentNode) {
+    // need to create this effect-slot for this bucket?
+    const thisNode = bucket.currentNode;
+
+    if (!(bucket.nextEffectIdx in bucket.effects)) {
+      bucket.effects[bucket.nextEffectIdx] = [];
+    }
+
+    let effectIdx = bucket.nextEffectIdx;
+    let effect = bucket.effects[effectIdx];
+
+    // check guards?
+    if (guardsChanged(effect[1], guards)) {
+      // define effect handler
+      effect[0] = function effect() {
+        // run a previous cleanup first?
+        if (typeof bucket.cleanups[effectIdx] == "function") {
+          try {
+            bucket.cleanups[effectIdx]();
+          } finally {
+            bucket.cleanups[effectIdx] = undefined;
+          }
+        }
+
+        const handler = (event) => {
+          bucket.events.push(event);
+          thisNode.event = true;
+        };
+
+        // only invoke effect handler if event present
+        thisNode.ref.addEventListener(name, handler);
+
+        // save clean ups
+        bucket.cleanups[effectIdx] = () => {
+          thisNode.ref.removeEventListener(name, handler);
+        };
+      };
+      effect[1] = guards;
+    }
+
+    // invoke the effect itself
+    let event;
+    for (let i = 0; i < bucket.events.length; i++) {
+      if (bucket.events[i].type === name) {
+        event = bucket.events.splice(i, 1)[0];
+      }
+    }
+    if (event) {
+      fn(event);
+      if (!bucket.events.length) {
+        thisNode.event = false;
+      }
+    }
+
+    bucket.nextEffectIdx++;
+  } else {
+    throw new Error(
+      "usenode() only valid inside an Articulated Function or " +
+        "a Custom Hook with setNode applied"
+    );
   }
 }
 
@@ -109,15 +229,22 @@ export function useState(initialVal) {
 export function useReducer(reducerFn, initialVal, ...initialReduction) {
   var bucket = getCurrentBucket();
   if (bucket) {
+    const thisNode = bucket.currentNode;
+
     // need to create this state-slot for this bucket?
     if (!(bucket.nextStateSlotIdx in bucket.stateSlots)) {
       let slot = [
         typeof initialVal == "function" ? initialVal() : initialVal,
         function updateSlot(v) {
-          slot[0] = reducerFn(slot[0], v);
+          const prevVal = slot[0];
+          slot[0] = reducerFn(prevVal, v);
 
-          // HACK INJECT COMPONENT RENDER REQUEST
-          if (bucket.scheduleRender) bucket.scheduleRender();
+          // if (bucket.stack && bucket.stack.length) {
+          //   bucket.stack[bucket.nextStackIdx - 1].setState = true;
+          // }
+          if (thisNode && slot[0] !== prevVal) {
+            thisNode.stateSet = true;
+          }
         },
       ];
       bucket.stateSlots[bucket.nextStateSlotIdx] = slot;

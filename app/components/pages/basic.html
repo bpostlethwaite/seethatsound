@@ -6,7 +6,11 @@
     csound="{{csound}}"
   ></analysis-view>
   <p>
-    <button id="playButton" disabled="{{disabled}}">play</button>
+    <button
+      id="playButton"
+      onClick="{{play}}"
+      disabled="{{disabled}}"
+    >{{playButtonLabel}}</button>
   </p>
 
   <div id="editor"></div>
@@ -28,72 +32,72 @@
 <script type="module">
   import Editor from "./modules/editor/Editor.js";
   import Syn from "./modules/syn/index.js";
+ import {useState, useEffect} from "./modules/syn/hooks.js";
 
-
- function Page() {
-   return {
-     runExample() {
-       let docdata = {
-         uid: "123",
-         filename: "example.orc",
-         currentValue: document.getElementById("instruments").value,
-       };
-       let editor = new Editor({docdata});
-       editor.onMount(document.getElementById("editor"));
-
-       CsoundObj.importScripts("./js/").then(() => {
-         let random_colour;
-         CSOUND_AUDIO_CONTEXT.suspend();
-         const csound = new CsoundObj();
-
-         this.setState(() => ({csound, disabled: false}));
-
-         const messField = document.getElementById("console");
-         csound.setMessageCallback((msg) => {
-           csound.requestControlChannel("freq", function () {
-             const freq = Math.round(csound.getControlChannel("freq"));
-             messField.innerText = msg + " :: " + freq + " Hz";
-           });
-         });
-
-         csound.compileOrc(document.getElementById("instruments").value);
-         csound.start();
-         window.addEventListener(
-           "unload",
-           function (e) {
-             if (csound != null) csound.destroy();
-           },
-           false
-         );
-       });
-     },
-
-     connectedCallback() {
-       document
-         .getElementById("playButton")
-         .addEventListener("click", click_this);
-       setTimeout(() => {
-         this.runExample();
-       }, 500);
-     },
+ function basicPage() {
+   let docdata = {
+     uid: "123",
+     filename: "example.orc",
+     currentValue: document.getElementById("instruments").value,
    };
- }
+
+   const [csound, setCsound] = useState(null);
+   const [disabled, setDisabled] = useState(true);
+   const [playing, setPlaying] = useState(false);
+
+   useEffect( () => {
+     let editor = new Editor({docdata});
+     editor.onMount(document.getElementById("editor"));
+
+     CsoundObj.importScripts("./js/").then(() => {
+       let random_colour;
+       CSOUND_AUDIO_CONTEXT.suspend();
+       const csound = new CsoundObj();
+
+       setCsound(() => csound);
+       setDisabled(() => false);
+
+       const messField = document.getElementById("console");
+       csound.setMessageCallback((msg) => {
+         csound.requestControlChannel("freq", function () {
+           const freq = Math.round(csound.getControlChannel("freq"));
+           messField.innerText = msg + " :: " + freq + " Hz";
+         });
+       });
+
+       csound.compileOrc(document.getElementById("instruments").value);
+       csound.start();
+       window.addEventListener(
+         "unload",
+         function (e) {
+           if (csound != null) csound.destroy();
+         },
+         false
+       );
+     });
+   }, []);
+
+   const play = () => {
+     if (playing == false) {
+       CSOUND_AUDIO_CONTEXT.resume();
+       setPlaying(true);
+     } else {
+       CSOUND_AUDIO_CONTEXT.suspend();
+       setPlaying(false);
+     }
+   }
+
+   return {
+     playButtonLabel: playing ? "pause" : "play",
+     play,
+     csound,
+     disabled,
+   }
+
+ };
 
 
- let playing = false;
- function click_this() {
-    if (playing == false) {
-      CSOUND_AUDIO_CONTEXT.resume();
-      document.getElementById("playButton").innerText = "pause";
-      playing = true;
-    } else {
-      CSOUND_AUDIO_CONTEXT.suspend();
-      document.getElementById("playButton").innerText = "play";
-      playing = false;
-    }
-  }
-
- Syn("app-page").state({disabled: true, csound: null}).view(Page()).define();
+ Syn("app-page").render(basicPage).define();
 
 
 

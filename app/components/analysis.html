@@ -18,6 +18,7 @@
 
 <script type="module">
  import Syn from "./modules/syn/index.js";
+ import {TNG, useState, useEffect, useRef} from "./modules/syn/hooks.js";
 
  /* const AnalysisView = () => {
   *   let scopeId;
@@ -113,105 +114,106 @@
   *   }
   * } */
 
- const AnalysisView = () => {
-   let scopeId;
-   let magsId;
-   let analysisNode;
 
-   return {
-     scope() {
-       let ctx = document.getElementById("scope").getContext("2d");
-       let width = ctx.canvas.width;
-       let height = ctx.canvas.height;
-       let timeData = new Uint8Array(analysisNode.frequencyBinCount);
-       let scaling = height / 256;
-       let risingEdge = 0;
-       let edgeThreshold = 5;
-       analysisNode.getByteTimeDomainData(timeData);
+ function drawScope(analysisNode) {
+   let ctx = document.getElementById("scope").getContext("2d");
+   let width = ctx.canvas.width;
+   let height = ctx.canvas.height;
+   let timeData = new Uint8Array(analysisNode.frequencyBinCount);
+   let scaling = height / 256;
+   let risingEdge = 0;
+   let edgeThreshold = 5;
+   analysisNode.getByteTimeDomainData(timeData);
 
-       ctx.fillStyle = "rgba(0, 20, 0, 0.1)";
-       ctx.fillRect(0, 0, width, height);
-       ctx.lineWidth = 2;
-       ctx.strokeStyle = "green";
-       ctx.beginPath();
+   ctx.fillStyle = "rgba(0, 20, 0, 0.1)";
+   ctx.fillRect(0, 0, width, height);
+   ctx.lineWidth = 2;
+   ctx.strokeStyle = "green";
+   ctx.beginPath();
 
-       while (timeData[risingEdge++] - 128 > 0 && risingEdge <= width);
-       if (risingEdge >= width) risingEdge = 0;
-       while (
-         timeData[risingEdge++] - 128 < edgeThreshold &&
-         risingEdge <= width
-       );
-       if (risingEdge >= width) risingEdge = 0;
-       for (
-         let x = risingEdge;
-         x < timeData.length && x - risingEdge < width;
-         x++
-       )
-         ctx.lineTo(x - risingEdge, height - timeData[x] * scaling);
-       ctx.stroke();
-       scopeId = requestAnimationFrame(this.scope);
-     },
+   while (timeData[risingEdge++] - 128 > 0 && risingEdge <= width);
+   if (risingEdge >= width) risingEdge = 0;
+   while (timeData[risingEdge++] - 128 < edgeThreshold && risingEdge <= width);
+   if (risingEdge >= width) risingEdge = 0;
+   for (let x = risingEdge; x < timeData.length && x - risingEdge < width; x++)
+     ctx.lineTo(x - risingEdge, height - timeData[x] * scaling);
+   ctx.stroke();
+ }
 
-     mags() {
-       let ctx = document.getElementById("mags").getContext("2d");
-       let width = ctx.canvas.width;
-       let height = ctx.canvas.height;
-       let freqData = new Uint8Array(analysisNode.frequencyBinCount);
-       let scaling = height / 256;
+ function drawMags(analysisNode) {
+   let ctx = document.getElementById("mags").getContext("2d");
+   let width = ctx.canvas.width;
+   let height = ctx.canvas.height;
+   let freqData = new Uint8Array(analysisNode.frequencyBinCount);
+   let scaling = height / 256;
 
-       analysisNode.getByteFrequencyData(freqData);
+   analysisNode.getByteFrequencyData(freqData);
 
-       ctx.fillStyle = "rgba(0, 20, 0, 0.1)";
-       ctx.fillRect(0, 0, width, height);
-       ctx.lineWidth = 2;
-       ctx.strokeStyle = "green";
-       ctx.beginPath();
+   ctx.fillStyle = "rgba(0, 20, 0, 0.1)";
+   ctx.fillRect(0, 0, width, height);
+   ctx.lineWidth = 2;
+   ctx.strokeStyle = "green";
+   ctx.beginPath();
 
-       for (let x = 0; x < width; x++)
-         ctx.lineTo(x, height - freqData[x] * scaling);
+   for (let x = 0; x < width; x++) ctx.lineTo(x, height - freqData[x] * scaling);
 
-       ctx.stroke();
-       magsId = requestAnimationFrame(this.mags);
-     },
-
-     connectedCallback() {
-       this.scope = this.scope.bind(this);
-       this.mags = this.mags.bind(this);
-     },
-
-     disconnectedCallback() {
-       cancelAnimationFrame(scopeId);
-       cancelAnimationFrame(magsId);
-
-       if (analysisNode) {
-         this.props.csound.getNode().disconnect(analysisNode);
-         analysisNode = null;
-       }
-     },
-
-     updatedCallback(prevProps) {
-       if (prevProps.disabled && !this.props.disabled) {
-         analysisNode = CSOUND_AUDIO_CONTEXT.createAnalyser();
-         this.props.csound.getNode().connect(analysisNode);
-         scopeId = requestAnimationFrame(this.scope);
-         magsId = requestAnimationFrame(this.mags);
-       }
-
-       if (!prevProps.disabled && this.props.disabled) {
-         this.props.csound.getNode().disconnect(analysisNode);
-         analysisNode = null;
-         cancelAnimationFrame(scopeId);
-         cancelAnimationFrame(magsId);
-       }
-     }
-   }
+   ctx.stroke();
  }
 
 
+ function usePrevious(value) {
+   const ref = useRef();
+   useEffect(() => {
+     ref.current = value;
+   });
+   return ref.current;
+ }
 
- Syn("analysis-view")
-   .state({csound: null, disabled: true})
-   .view(AnalysisView())
-   .define();
+ function analysisView(props) {
+   let prevDisabled = usePrevious(props.disabled);
+   if (prevDisabled === undefined) {
+     prevDisabled = true;
+   }
+   const scopeRef = useRef();
+   const magsRef = useRef();
+   const analysisNodeRef = useRef(null);
+
+   if (prevDisabled && !props.disabled) {
+     analysisNodeRef.current = CSOUND_AUDIO_CONTEXT.createAnalyser();
+     props.csound.getNode().connect(analysisNodeRef.current);
+   }
+
+   if (!prevDisabled && props.disabled) {
+     props.csound.getNode().disconnect(analysisNodeRef.current);
+     analysisNodeRef.current = null;
+   }
+
+   useEffect(() => {
+     if (!analysisNodeRef.current) {
+       return;
+     }
+     const scope = (time) => {
+       drawScope(analysisNodeRef.current);
+       scopeRef.current = requestAnimationFrame(scope);
+     };
+     const mags = (time) => {
+       drawMags(analysisNodeRef.current);
+       magsRef.current = requestAnimationFrame(mags);
+     };
+
+     scopeRef.current = requestAnimationFrame(scope);
+     magsRef.current = requestAnimationFrame(mags);
+
+     return () => {
+       cancelAnimationFrame(scopeRef.current);
+       cancelAnimationFrame(magsRef.current);
+     };
+   }, [analysisNodeRef.current]);
+
+   return {}
+ }
+
+
+ Syn("analysis-view").render(analysisView).define();
 
 </script>

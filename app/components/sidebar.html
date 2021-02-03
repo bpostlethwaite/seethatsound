@@ -14,7 +14,10 @@
 <script type="module">
  import Syn from "./modules/syn/index.js";
 
- const pages = window.globals.pages;
- const title = "See That Sound";
- Syn("app-sidebar").state({title, pages}).define();
+ function appSidebar() {
+   const pages = window.globals.pages;
+   const title = "See That Sound";
+   return {title, pages};
+ }
+ Syn("app-sidebar").render(appSidebar).define();
 </script>

@@ -1,23 +1,118 @@
-<link rel="shortcut icon" type="image/png" href="lib/jasmine-3.6.0/jasmine_favicon.png">
-<link rel="stylesheet" type="text/css" href="lib/jasmine-3.6.0/jasmine.css">
+<template id="test-helloa">
+  <div>{{name}}</div>
+</template>
 
-<script type="text/javascript" src="lib/jasmine-3.6.0/jasmine.js"></script>
-<script type="text/javascript" src="lib/jasmine-3.6.0/jasmine-html.js"></script>
-<script type="text/javascript" src="lib/jasmine-3.6.0/boot.js"></script>
+<template id="test-hello">
+  <test-helloa name="{{name}}"></test-helloa>
+</template>
+
+<script type="module">
+ import {useEffect} from "./modules/syn/hooks2.js";
+
+ const ONCE = [];
+ window.SynTest = function(dispatch) {
+   return {
+     start(testEffect) {
+       useEffect(() => {
+         dispatch(new CustomEvent("start", {bubbles: true}));
+       }, ONCE);
+     },
+
+     stop() {
+       useEffect(() => {
+         dispatch(new CustomEvent("stop", {bubbles: true}));
+       }, ONCE);
+     },
+
+     assert(pass, msg) {
+       useEffect(() => {
+         dispatch(new CustomEvent("test", {
+           bubbles: true,
+           detail: {
+             msg,
+             pass,
+           }
+         }));
+       }, ONCE);
+     },
+   };
+ };
 
 
-<template id="test-1">
-  <button disabled="{{}}"></button>
+</script>
+
+
+<script type="module">
+ import Syn from "./modules/syn/index.js";
+ import {useEffect, useEvent} from "./modules/syn/hooks2.js";
+
+ Syn("test-helloa").render((props, dispatch) => {
+   const st = window.SynTest(dispatch);
+   st.start();
+   st.assert(props.name === "hello", "props.name === hello");
+   st.stop();
+
+   return {name: props.name};
+ }).define();
+
+ Syn("test-hello").render(() => ({name: "hello"})).define();
+</script>
+
+
+
+<template id="app-page">
+  <template id="tests">
+    <test-hello></test-hello>
+  </template>
+
+  <div id="test"></div>
 </template>
 
 <script type="module">
  import Syn from "./modules/syn/index.js";
+ import {useEffect, useEvent, useState, useRef} from "./modules/syn/hooks2.js";
 
- const view = {
-   connectedCallback() {
-     this.setState({disabled: false});
+ Syn("app-page").render(() => {
+
+   const [testIdx, setTestIdx] = useState(0);
+   const results = useRef([]);
+
+   const nextTest = () => {
+     setTestIdx((idx) => idx + 1);
    }
- }
- Syn("test-1").view(view).state({disabled: true}).define();
 
+   useEvent("start", (ev) => {
+     console.log("Starting Test", ev);
+   }, []);
+
+   useEvent("stop", (ev) => {
+     nextTest();
+   }, []);
+
+
+   useEvent("test", (ev) => {
+     const res = ev.detail;
+     if (!Array.isArray(results.current[testIdx])) {
+       results.current[testIdx] = [];
+     }
+     results.current[testIdx].push(res);
+   }, []);
+
+
+   useEffect(() => {
+     const tests = Array.from($("#tests").content.children);
+     const test = $("#test");
+     while (test.firstChild) {
+       test.removeChild(test.lastChild);
+     }
+     if (testIdx < tests.length) {
+       test.appendChild(tests[testIdx]);
+     } else {
+       console.log("DONE", results.current);
+     }
+
+
+   }, [testIdx]);
+
+ }).define();
 </script>
